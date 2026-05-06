@@ -25,7 +25,7 @@ pub enum BaseCommitSource {
 /// Read the `.claw-base` file from the given directory and return the trimmed
 /// commit hash, or `None` when the file is absent or empty.
 pub fn read_claw_base_file(cwd: &Path) -> Option<String> {
-    let path = cwd.join(".claw-base");
+    let path = cwd.join(".taurus-base");
     let content = std::fs::read_to_string(path).ok()?;
     let trimmed = content.trim();
     if trimmed.is_empty() {

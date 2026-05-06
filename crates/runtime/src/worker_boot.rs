@@ -862,7 +862,7 @@ struct StateSnapshot<'a> {
 }
 
 fn emit_state_file(worker: &Worker) {
-    let state_dir = std::path::Path::new(&worker.cwd).join(".claw");
+    let state_dir = std::path::Path::new(&worker.cwd).join(".taurus");
     if std::fs::create_dir_all(&state_dir).is_err() {
         return;
     }

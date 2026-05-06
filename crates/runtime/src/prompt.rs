@@ -263,8 +263,8 @@ fn discover_instruction_files(cwd: &Path) -> std::io::Result<Vec<ContextFile>> {
         for candidate in [
             dir.join("CLAUDE.md"),
             dir.join("CLAUDE.local.md"),
-            dir.join(".claw").join("CLAUDE.md"),
-            dir.join(".claw").join("instructions.md"),
+            dir.join(".taurus").join("CLAUDE.md"),
+            dir.join(".taurus").join("instructions.md"),
         ] {
             push_context_file(&mut files, candidate)?;
         }
@@ -516,7 +516,7 @@ fn render_config_section(config: &RuntimeConfig) -> String {
     let mut lines = vec!["# Runtime config".to_string()];
     if config.loaded_entries().is_empty() {
         lines.extend(prepend_bullets(vec![
-            "No Claw Code settings files loaded.".to_string()
+            "No Taurus settings files loaded.".to_string()
         ]));
         return lines.join("\n");
     }
@@ -636,23 +636,23 @@ mod tests {
     fn discovers_instruction_files_from_ancestor_chain() {
         let root = temp_dir();
         let nested = root.join("apps").join("api");
-        fs::create_dir_all(nested.join(".claw")).expect("nested claw dir");
+        fs::create_dir_all(nested.join(".taurus")).expect("nested claw dir");
         fs::write(root.join("CLAUDE.md"), "root instructions").expect("write root instructions");
         fs::write(root.join("CLAUDE.local.md"), "local instructions")
             .expect("write local instructions");
         fs::create_dir_all(root.join("apps")).expect("apps dir");
-        fs::create_dir_all(root.join("apps").join(".claw")).expect("apps claw dir");
+        fs::create_dir_all(root.join("apps").join(".taurus")).expect("apps claw dir");
         fs::write(root.join("apps").join("CLAUDE.md"), "apps instructions")
             .expect("write apps instructions");
         fs::write(
-            root.join("apps").join(".claw").join("instructions.md"),
+            root.join("apps").join(".taurus").join("instructions.md"),
             "apps dot claude instructions",
         )
         .expect("write apps dot claude instructions");
-        fs::write(nested.join(".claw").join("CLAUDE.md"), "nested rules")
+        fs::write(nested.join(".taurus").join("CLAUDE.md"), "nested rules")
             .expect("write nested rules");
         fs::write(
-            nested.join(".claw").join("instructions.md"),
+            nested.join(".taurus").join("instructions.md"),
             "nested instructions",
         )
         .expect("write nested instructions");
@@ -872,10 +872,10 @@ mod tests {
     #[test]
     fn load_system_prompt_reads_claude_files_and_config() {
         let root = temp_dir();
-        fs::create_dir_all(root.join(".claw")).expect("claw dir");
+        fs::create_dir_all(root.join(".taurus")).expect("claw dir");
         fs::write(root.join("CLAUDE.md"), "Project rules").expect("write instructions");
         fs::write(
-            root.join(".claw").join("settings.json"),
+            root.join(".taurus").join("settings.json"),
             r#"{"permissionMode":"acceptEdits"}"#,
         )
         .expect("write settings");
@@ -965,10 +965,10 @@ mod tests {
     #[test]
     fn renders_claude_code_style_sections_with_project_context() {
         let root = temp_dir();
-        fs::create_dir_all(root.join(".claw")).expect("claw dir");
+        fs::create_dir_all(root.join(".taurus")).expect("claw dir");
         fs::write(root.join("CLAUDE.md"), "Project rules").expect("write CLAUDE.md");
         fs::write(
-            root.join(".claw").join("settings.json"),
+            root.join(".taurus").join("settings.json"),
             r#"{"permissionMode":"acceptEdits"}"#,
         )
         .expect("write settings");
@@ -1007,9 +1007,9 @@ mod tests {
     fn discovers_dot_claude_instructions_markdown() {
         let root = temp_dir();
         let nested = root.join("apps").join("api");
-        fs::create_dir_all(nested.join(".claw")).expect("nested claw dir");
+        fs::create_dir_all(nested.join(".taurus")).expect("nested claw dir");
         fs::write(
-            nested.join(".claw").join("instructions.md"),
+            nested.join(".taurus").join("instructions.md"),
             "instruction markdown",
         )
         .expect("write instructions.md");

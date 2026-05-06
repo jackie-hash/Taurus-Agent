@@ -389,6 +389,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             allowed_tools,
             permission_mode,
             compact,
+            show_thinking,
             base_commit,
             reasoning_effort,
             allow_broad_cwd,
@@ -408,6 +409,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             let effective_prompt = merge_prompt_with_stdin(&prompt, stdin_context.as_deref());
             let mut cli = LiveCli::new(model, true, allowed_tools, permission_mode)?;
             cli.set_reasoning_effort(reasoning_effort);
+            cli.set_show_thinking(show_thinking);
             cli.run_turn_with_output(&effective_prompt, output_format, compact)?;
         }
         CliAction::Doctor { output_format } => run_doctor(output_format)?,
@@ -452,6 +454,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             model,
             allowed_tools,
             permission_mode,
+            show_thinking,
             base_commit,
             reasoning_effort,
             allow_broad_cwd,
@@ -459,6 +462,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             model,
             allowed_tools,
             permission_mode,
+            show_thinking,
             base_commit,
             reasoning_effort,
             allow_broad_cwd,
@@ -532,6 +536,7 @@ enum CliAction {
         allowed_tools: Option<AllowedToolSet>,
         permission_mode: PermissionMode,
         compact: bool,
+        show_thinking: bool,
         base_commit: Option<String>,
         reasoning_effort: Option<String>,
         allow_broad_cwd: bool,
@@ -566,6 +571,7 @@ enum CliAction {
         model: String,
         allowed_tools: Option<AllowedToolSet>,
         permission_mode: PermissionMode,
+        show_thinking: bool,
         base_commit: Option<String>,
         reasoning_effort: Option<String>,
         allow_broad_cwd: bool,
@@ -627,6 +633,7 @@ fn parse_args(args: &[String]) -> Result<CliAction, String> {
     let mut wants_version = false;
     let mut allowed_tool_values = Vec::new();
     let mut compact = false;
+    let mut show_thinking = false;
     let mut base_commit: Option<String> = None;
     let mut reasoning_effort: Option<String> = None;
     let mut allow_broad_cwd = false;
@@ -704,6 +711,10 @@ fn parse_args(args: &[String]) -> Result<CliAction, String> {
                 compact = true;
                 index += 1;
             }
+            "--show-thinking" => {
+                show_thinking = true;
+                index += 1;
+            }
             "--base-commit" => {
                 let value = args
                     .get(index + 1)
@@ -755,6 +766,7 @@ fn parse_args(args: &[String]) -> Result<CliAction, String> {
                     permission_mode: permission_mode_override
                         .unwrap_or_else(default_permission_mode),
                     compact,
+                    show_thinking,
                     base_commit: base_commit.clone(),
                     reasoning_effort: reasoning_effort.clone(),
                     allow_broad_cwd,
@@ -831,6 +843,7 @@ fn parse_args(args: &[String]) -> Result<CliAction, String> {
                     permission_mode,
                     output_format,
                     compact: false,
+                    show_thinking: false,
                     base_commit,
                     reasoning_effort,
                     allow_broad_cwd,
@@ -841,6 +854,7 @@ fn parse_args(args: &[String]) -> Result<CliAction, String> {
             model,
             allowed_tools,
             permission_mode,
+            show_thinking,
             base_commit,
             reasoning_effort: reasoning_effort.clone(),
             allow_broad_cwd,
@@ -954,6 +968,7 @@ fn parse_args(args: &[String]) -> Result<CliAction, String> {
                     allowed_tools,
                     permission_mode,
                     compact,
+                    show_thinking: false,
                     base_commit,
                     reasoning_effort: reasoning_effort.clone(),
                     allow_broad_cwd,
@@ -981,6 +996,7 @@ fn parse_args(args: &[String]) -> Result<CliAction, String> {
                 allowed_tools,
                 permission_mode,
                 compact,
+                show_thinking,
                 base_commit: base_commit.clone(),
                 reasoning_effort: reasoning_effort.clone(),
                 allow_broad_cwd,
@@ -1031,6 +1047,7 @@ fn parse_args(args: &[String]) -> Result<CliAction, String> {
                 allowed_tools,
                 permission_mode,
                 compact,
+                show_thinking,
                 base_commit,
                 reasoning_effort: reasoning_effort.clone(),
                 allow_broad_cwd,
@@ -1246,6 +1263,7 @@ fn parse_direct_slash_cli_action(
                     allowed_tools,
                     permission_mode,
                     compact,
+                    show_thinking: false,
                     base_commit,
                     reasoning_effort: reasoning_effort.clone(),
                     allow_broad_cwd,
@@ -3856,6 +3874,7 @@ fn run_repl(
     model: String,
     allowed_tools: Option<AllowedToolSet>,
     permission_mode: PermissionMode,
+    show_thinking: bool,
     base_commit: Option<String>,
     reasoning_effort: Option<String>,
     allow_broad_cwd: bool,
@@ -3865,6 +3884,7 @@ fn run_repl(
     let resolved_model = resolve_repl_model(model);
     let mut cli = LiveCli::new(resolved_model, true, allowed_tools, permission_mode)?;
     cli.set_reasoning_effort(reasoning_effort);
+    cli.set_show_thinking(show_thinking);
     let mut editor =
         input::LineEditor::new("> ", cli.repl_completion_candidates().unwrap_or_default());
     println!("{}", cli.startup_banner());
@@ -3946,6 +3966,7 @@ struct LiveCli {
     runtime: BuiltRuntime,
     session: SessionHandle,
     prompt_history: Vec<PromptHistoryEntry>,
+    show_thinking: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -4454,6 +4475,7 @@ impl LiveCli {
             runtime,
             session,
             prompt_history: Vec::new(),
+            show_thinking: false,
         };
         cli.persist_session()?;
         Ok(cli)
@@ -4462,6 +4484,13 @@ impl LiveCli {
     fn set_reasoning_effort(&mut self, effort: Option<String>) {
         if let Some(rt) = self.runtime.runtime.as_mut() {
             rt.api_client_mut().set_reasoning_effort(effort);
+        }
+    }
+
+    fn set_show_thinking(&mut self, show: bool) {
+        self.show_thinking = show;
+        if let Some(rt) = self.runtime.runtime.as_mut() {
+            rt.api_client_mut().set_show_thinking(show);
         }
     }
 
@@ -7033,7 +7062,9 @@ fn render_export_text(session: &Session) -> String {
         for block in &message.blocks {
             match block {
                 ContentBlock::Text { text } => lines.push(text.clone()),
-                ContentBlock::Thinking { .. } => {}
+                ContentBlock::Thinking { thinking, .. } => {
+                    lines.push(format!("[thinking] {thinking}"));
+                }
                 ContentBlock::ToolUse { id, name, input } => {
                     lines.push(format!("[tool_use id={id} name={name}] {input}"));
                 }
@@ -7220,7 +7251,9 @@ fn render_session_markdown(session: &Session, session_id: &str, session_path: &P
                         lines.push(String::new());
                     }
                 }
-                ContentBlock::Thinking { .. } => {}
+                ContentBlock::Thinking { thinking, .. } => {
+                    lines.push(format!("**Thinking**\n\n```\n{thinking}\n```\n"));
+                }
                 ContentBlock::ToolUse { id, name, input } => {
                     lines.push(format!(
                         "**Tool call** `{name}` _(id `{}`)_",
@@ -7877,6 +7910,7 @@ struct TaurusRuntimeClient {
     tool_registry: GlobalToolRegistry,
     progress_reporter: Option<InternalPromptProgressReporter>,
     reasoning_effort: Option<String>,
+    show_thinking: bool,
 }
 
 impl TaurusRuntimeClient {
@@ -7902,11 +7936,16 @@ impl TaurusRuntimeClient {
             tool_registry,
             progress_reporter,
             reasoning_effort: None,
+            show_thinking: false,
         })
     }
 
     fn set_reasoning_effort(&mut self, effort: Option<String>) {
         self.reasoning_effort = effort;
+    }
+
+    fn set_show_thinking(&mut self, show: bool) {
+        self.show_thinking = show;
     }
 }
 
@@ -7987,6 +8026,7 @@ impl TaurusRuntimeClient {
         let mut markdown_stream = MarkdownStreamState::default();
         let mut events = Vec::new();
         let mut pending_tool: Option<(String, String, String)> = None;
+        let mut pending_thinking: Option<(String, Option<String>)> = None;
         let mut block_has_thinking_summary = false;
         let mut saw_stop = false;
         let mut received_any_event = false;
@@ -8024,6 +8064,7 @@ impl TaurusRuntimeClient {
                             &mut pending_tool,
                             true,
                             &mut block_has_thinking_summary,
+                            self.show_thinking,
                         )?;
                     }
                 }
@@ -8035,6 +8076,7 @@ impl TaurusRuntimeClient {
                         &mut pending_tool,
                         true,
                         &mut block_has_thinking_summary,
+                        self.show_thinking,
                     )?;
                 }
                 ApiStreamEvent::ContentBlockDelta(delta) => match delta.delta {
@@ -8056,16 +8098,29 @@ impl TaurusRuntimeClient {
                             input.push_str(&partial_json);
                         }
                     }
-                    ContentBlockDelta::ThinkingDelta { .. } => {
+                    ContentBlockDelta::ThinkingDelta { thinking } => {
                         if !block_has_thinking_summary {
-                            render_thinking_block_summary(out, None, false)?;
+                            render_thinking_block_summary(out, None, false, self.show_thinking)?;
                             block_has_thinking_summary = true;
                         }
+                        if self.show_thinking && !thinking.is_empty() {
+                            write!(out, "{thinking}")
+                                .and_then(|()| out.flush())
+                                .map_err(|error| RuntimeError::new(error.to_string()))?;
+                        }
+                        let acc = pending_thinking.get_or_insert_with(|| (String::new(), None));
+                        acc.0.push_str(&thinking);
                     }
-                    ContentBlockDelta::SignatureDelta { .. } => {}
+                    ContentBlockDelta::SignatureDelta { signature } => {
+                        let acc = pending_thinking.get_or_insert_with(|| (String::new(), None));
+                        acc.1 = Some(signature);
+                    }
                 },
                 ApiStreamEvent::ContentBlockStop(_) => {
                     block_has_thinking_summary = false;
+                    if let Some((thinking, signature)) = pending_thinking.take() {
+                        events.push(AssistantEvent::Thinking { thinking, signature });
+                    }
                     if let Some(rendered) = markdown_stream.flush(&renderer) {
                         write!(out, "{rendered}")
                             .and_then(|()| out.flush())
@@ -8125,7 +8180,7 @@ impl TaurusRuntimeClient {
             .map_err(|error| {
                 RuntimeError::new(format_user_visible_api_error(&self.session_id, &error))
             })?;
-        let mut events = response_to_events(response, out)?;
+        let mut events = response_to_events(response, out, self.show_thinking)?;
         push_prompt_cache_record(&self.client, &mut events);
         Ok(events)
     }
@@ -8938,13 +8993,20 @@ fn render_thinking_block_summary(
     out: &mut (impl Write + ?Sized),
     char_count: Option<usize>,
     redacted: bool,
+    show_thinking: bool,
 ) -> Result<(), RuntimeError> {
     let summary = if redacted {
-        "\n▶ Thinking block hidden by provider\n".to_string()
-    } else if let Some(char_count) = char_count {
-        format!("\n▶ Thinking ({char_count} chars hidden)\n")
+        "\n  \u{1f9e0} Thinking (hidden by provider)\n".to_string()
+    } else if show_thinking {
+        if let Some(count) = char_count {
+            format!("\n  \u{1f9e0} Thinking ({count} chars):\n")
+        } else {
+            "\n  \u{1f9e0} Thinking:\n".to_string()
+        }
+    } else if let Some(count) = char_count {
+        format!("\n  \u{1f9e0} Thinking ({count} chars hidden)\n")
     } else {
-        "\n▶ Thinking hidden\n".to_string()
+        "\n  \u{1f9e0} Thinking hidden\n".to_string()
     };
     write!(out, "{summary}")
         .and_then(|()| out.flush())
@@ -8958,6 +9020,7 @@ fn push_output_block(
     pending_tool: &mut Option<(String, String, String)>,
     streaming_tool_input: bool,
     block_has_thinking_summary: &mut bool,
+    show_thinking: bool,
 ) -> Result<(), RuntimeError> {
     match block {
         OutputContentBlock::Text { text } => {
@@ -8983,12 +9046,24 @@ fn push_output_block(
             };
             *pending_tool = Some((id, name, initial_input));
         }
-        OutputContentBlock::Thinking { thinking, .. } => {
-            render_thinking_block_summary(out, Some(thinking.chars().count()), false)?;
+        OutputContentBlock::Thinking { thinking, signature } => {
+            let is_streaming_empty = streaming_tool_input && thinking.is_empty();
+            render_thinking_block_summary(out, Some(thinking.chars().count()), false, show_thinking)?;
+            if show_thinking && !thinking.is_empty() {
+                writeln!(out, "{thinking}")
+                    .and_then(|()| out.flush())
+                    .map_err(|error| RuntimeError::new(error.to_string()))?;
+            }
+            if !is_streaming_empty {
+                events.push(AssistantEvent::Thinking {
+                    thinking: thinking.clone(),
+                    signature: signature.clone(),
+                });
+            }
             *block_has_thinking_summary = true;
         }
         OutputContentBlock::RedactedThinking { .. } => {
-            render_thinking_block_summary(out, None, true)?;
+            render_thinking_block_summary(out, None, true, show_thinking)?;
             *block_has_thinking_summary = true;
         }
     }
@@ -8998,6 +9073,7 @@ fn push_output_block(
 fn response_to_events(
     response: MessageResponse,
     out: &mut (impl Write + ?Sized),
+    show_thinking: bool,
 ) -> Result<Vec<AssistantEvent>, RuntimeError> {
     let mut events = Vec::new();
     let mut pending_tool = None;
@@ -9011,6 +9087,7 @@ fn response_to_events(
             &mut pending_tool,
             false,
             &mut block_has_thinking_summary,
+            show_thinking,
         )?;
         if let Some((id, name, input)) = pending_tool.take() {
             events.push(AssistantEvent::ToolUse { id, name, input });
@@ -9206,7 +9283,12 @@ fn convert_messages(messages: &[ConversationMessage]) -> Vec<InputMessage> {
                     ContentBlock::Text { text } => {
                         Some(InputContentBlock::Text { text: text.clone() })
                     }
-                    ContentBlock::Thinking { .. } => None,
+                    ContentBlock::Thinking { thinking, signature } => {
+                        Some(InputContentBlock::Thinking {
+                            thinking: thinking.clone(),
+                            signature: signature.clone(),
+                        })
+                    }
                     ContentBlock::ToolUse { id, name, input } => Some(InputContentBlock::ToolUse {
                         id: id.clone(),
                         name: name.clone(),
@@ -13147,6 +13229,7 @@ UU conflicted.rs",
             &mut pending_tool,
             false,
             &mut block_has_thinking_summary,
+            false,
         )
         .expect("text block should render");
 
@@ -13173,6 +13256,7 @@ UU conflicted.rs",
             &mut pending_tool,
             true,
             &mut block_has_thinking_summary,
+            false,
         )
         .expect("tool block should accumulate");
 
@@ -13208,6 +13292,7 @@ UU conflicted.rs",
                 request_id: None,
             },
             &mut out,
+            false,
         )
         .expect("response conversion should succeed");
 
@@ -13243,6 +13328,7 @@ UU conflicted.rs",
                 request_id: None,
             },
             &mut out,
+            false,
         )
         .expect("response conversion should succeed");
 
@@ -13282,6 +13368,7 @@ UU conflicted.rs",
                 request_id: None,
             },
             &mut out,
+            false,
         )
         .expect("response conversion should succeed");
 
