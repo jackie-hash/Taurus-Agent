@@ -1,6 +1,6 @@
-# Aldebaran
+# Taurus Agent
 
-Aldebaran（毕宿五），金牛座中最亮的恒星。一个 [DeepSeek](https://platform.deepseek.com/) 原生的终端 AI 编程助手。
+一个 [DeepSeek](https://platform.deepseek.com/) 原生的终端 AI 编程助手。
 
 基于 [claw-code](https://github.com/ultraworkers/claw-code) 重构，适配 DeepSeek V4 API。
 
@@ -15,8 +15,8 @@ Aldebaran（毕宿五），金牛座中最亮的恒星。一个 [DeepSeek](https
 
 ```bash
 # 克隆仓库
-git clone https://github.com/YOUR_USERNAME/aldebaran.git
-cd aldebaran
+git clone https://github.com/jackie-hash/Taurus-Agent.git
+cd Taurus-Agent
 
 # 编译
 cargo build --release -p taurus-cli
