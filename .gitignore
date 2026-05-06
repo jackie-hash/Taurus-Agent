@@ -1,0 +1,13 @@
+target/
+.omx/
+.omc/
+.env
+.sandbox-home/
+.claude/
+# Taurus local artifacts
+.taurus/sessions/
+.claw/
+.claw.json
+.clawd-todos.json
+.clawd-agents/
+.clawhip/
